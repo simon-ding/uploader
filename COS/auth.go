@@ -72,10 +72,15 @@ func signKey(key, qKeyTime string) string {
 
 func httpString(req *http.Request) string {
 	method := strings.ToLower(req.Method)
-	uri := req.URL.Path //EscapedPath??
+	uri := req.URL.EscapedPath()
+	if uri == "" {
+		uri = "/"
+	}
 	params := httpParams(req)
 	headers := httpHeaders(req)
-	return fmt.Sprintf("%s\n%s\n%s\n%s\n", method, uri, params, headers)
+	httpString := fmt.Sprintf("%s\n%s\n%s\n%s\n", method, uri, params, headers)
+	//fmt.Println("httpString", httpString)
+	return httpString
 }
 
 //HttpParameters
@@ -113,6 +118,7 @@ func httpHeaders(req *http.Request) string {
 		v := req.Header.Get(k)
 		res += k + "=" + url.PathEscape(v)
 	}
+	fmt.Println(res)
 	return res
 }
 
@@ -120,7 +126,7 @@ func stringToSign(req *http.Request, qSignTime string) string {
 	HTTPString := httpString(req)
 	h := sha1.New()
 	io.WriteString(h, HTTPString)
-	return fmt.Sprintf("%s\n%s\n%s\n", qSignAlgorithm, qSignTime, h.Sum(nil))
+	return fmt.Sprintf("%s\n%s\n%x\n", qSignAlgorithm, qSignTime, h.Sum(nil))
 }
 
 func signature(req *http.Request, SecretKey string) string {

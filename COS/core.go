@@ -3,18 +3,26 @@ package COS
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 )
 
-type COS struct {
+type Client struct {
 	client *http.Client
 	bucket string
 }
 
-func NewCOS(secretID, secretKey, bucketURL string) *COS {
+func NewClient(secretID, secretKey, bucketURL string) *Client {
 	t := transport{secretID: secretID, screctKey: secretKey}
 	client := &http.Client{Transport: t}
-	return &COS{client: client, bucket: bucketURL}
+	u, err := url.Parse(bucketURL)
+	u.Scheme = "https"
+	if err != nil {
+		log.Fatalf("url not valid: %v", err)
+	}
+	return &Client{client: client, bucket: u.String()}
 }
 
 type transport struct {
@@ -28,7 +36,7 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 //put a local object into bucket
-func (c *COS) PutObject(object io.Reader) error {
+func (c *Client) PutObject(object io.Reader) error {
 	req, err := http.NewRequest("PUT", "http://"+c.bucket, object)
 	if err != nil {
 		return err
@@ -41,5 +49,16 @@ func (c *COS) PutObject(object io.Reader) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("response status error: %s", resp.Status)
 	}
+	return nil
+}
+
+func (c *Client) GetBucket() error {
+	resp, err := c.client.Get(c.bucket)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, _ := ioutil.ReadAll(resp.Body)
+	fmt.Print("%s", string(b))
 	return nil
 }
