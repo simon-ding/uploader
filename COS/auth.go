@@ -1,6 +1,8 @@
 package COS
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"fmt"
@@ -30,8 +32,7 @@ func sign(req *http.Request, screctKey, secretID string) {
 	authHeader := fmt.Sprintf("q-sign-algorithm=%s&q-ak=%s&q-sign-time=%s&q-key-time=%s&q-header-list=%s&q-url-param-list=%s&q-signature=%s",
 		qSignAlgorithm, qAk, qSignTime, qKeyTime, qHeaderList, qURLParamList, qSignature)
 	req.Header.Add("Authorization", authHeader)
-	fmt.Println(authHeader)
-	fmt.Println("headers", req.Header)
+	//fmt.Println("headers", req.Header)
 }
 
 //q-sign-time, q-key-time
@@ -110,15 +111,15 @@ func toLower(m url.Values) url.Values {
 
 func httpHeaders(req *http.Request) string {
 	list := headerList(req)
+	headers := req.Header
 	var res string
 	for _, k := range list {
 		if res != "" {
 			res += "&"
 		}
-		v := req.Header.Get(k)
+		v := headers.Get(k)
 		res += k + "=" + url.PathEscape(v)
 	}
-	fmt.Println(res)
 	return res
 }
 
@@ -135,4 +136,25 @@ func signature(req *http.Request, SecretKey string) string {
 	h := hmac.New(sha1.New, []byte(signKey))
 	io.WriteString(h, stringToSign(req, qSignTime))
 	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+//get all the headers of a http request, include those not included in Request.Header
+func getAllHeaders(req *http.Request) http.Header {
+	headers := make(http.Header)
+	b := new(bytes.Buffer)
+	req.Write(b)
+	scanner := bufio.NewScanner(b)
+	for scanner.Scan() {
+		line := scanner.Text()
+		header := strings.Split(line, ":")
+		if len(header) < 2 {
+			continue
+		}
+		headers.Add(header[0], header[1])
+	}
+	for k, v := range req.Header {
+		headers[k] = v
+	}
+	//fmt.Println("All headers", headers)
+	return headers
 }
